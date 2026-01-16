@@ -1,0 +1,10 @@
+{
+  "$schema": "https://zeabur.com/schemas/zbpack.json",
+  "build_command": "npm install && npm run build && npx prisma generate",
+  "start_command": "npx prisma migrate deploy && npm run start:prod",
+  "dockerfile": null,
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "3001"
+  }
+}

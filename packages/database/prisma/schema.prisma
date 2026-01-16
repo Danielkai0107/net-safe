@@ -1,0 +1,473 @@
+// Safe-Net Database Schema
+// 社區守護者 - 志工巡守追蹤系統
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 核心實體 ====================
+
+// Tenant - 社區/組織
+model Tenant {
+  id             String   @id @default(cuid())
+  code           String   @unique // 社區代碼，例如：DALOVE001
+  name           String   // 社區名稱，例如：大愛社區
+  address        String?  // 地址
+  contactPerson  String?  // 聯絡人
+  contactPhone   String?  // 聯絡電話
+  settings       Json?    // 社區設定（JSON 格式，如警報閾值等）
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  elders   Elder[]
+  gateways Gateway[]
+  users    User[]
+  alerts   Alert[]
+  members  TenantMember[]  // App 成員
+  devices  Device[]        // 分配的設備
+
+  @@map("tenants")
+}
+
+// Elder - 長者
+model Elder {
+  id               String   @id @default(cuid())
+  tenantId         String
+  name             String   // 長者姓名
+  phone            String?  // 電話
+  address          String?  // 住址
+  emergencyContact String?  // 緊急聯絡人
+  emergencyPhone   String?  // 緊急聯絡電話
+  photo            String?  // 照片 URL
+  notes            String?  // 備註
+  status           ElderStatus @default(ACTIVE)
+  
+  // 警報設定
+  inactiveThresholdHours Int @default(24) // 不活躍警報閾值（小時）
+  lastActivityAt         DateTime? // 最後活動時間
+  lastSeenLocation       Json? // 最後出現位置 {lat, lng, address}
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device       Device?       // 一對一關聯
+  alerts       Alert[]
+  locationLogs LocationLog[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([lastActivityAt])
+  @@map("elders")
+}
+
+// Device - 藍牙設備（Beacon）
+model Device {
+  id          String   @id @default(cuid())
+  tenantId    String?  // 分配給哪個社區（可選，未分配時為 null）
+  elderId     String?  @unique // 一對一關聯（可選，設備可以先存在不分配給長者）
+  macAddress  String   @unique // MAC Address（唯一識別）
+  uuid        String?  // iBeacon UUID
+  major       Int?     // iBeacon Major
+  minor       Int?     // iBeacon Minor
+  deviceName  String?  // 設備名稱
+  type        DeviceType @default(IBEACON)
+  
+  // 設備狀態
+  batteryLevel   Int?      // 電池電量（百分比）
+  lastSeen       DateTime? // 最後偵測時間
+  lastRssi       Int?      // 最後訊號強度
+  lastGatewayId  String?   // 最後偵測的 Gateway ID
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tenant      Tenant?      @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  elder       Elder?       @relation(fields: [elderId], references: [id], onDelete: SetNull)
+  logs        Log[]
+  lastGateway Gateway?     @relation("LastSeenGateway", fields: [lastGatewayId], references: [id])
+
+  @@index([tenantId])
+  @@index([macAddress])
+  @@index([uuid, major, minor])
+  @@index([lastSeen])
+  @@index([elderId])
+  @@map("devices")
+}
+
+// Gateway - 訊號接收點
+model Gateway {
+  id           String   @id @default(cuid())
+  tenantId     String
+  serialNumber String   @unique // 序列號（固定式：硬體序號；移動式：MOBILE-{型號}-{隨機碼}）
+  name         String   // 接收點名稱，例如：大愛社 001、志工巡守
+  location     String?  // 位置描述
+  type         GatewayType @default(GENERAL) // general / boundary / mobile
+  
+  // GPS 座標（固定式接收點）
+  latitude  Float?
+  longitude Float?
+  
+  // 移動接收點資訊（type = mobile 時使用）
+  deviceInfo Json? // {brand, model, osVersion, appVersion}
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tenant            Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  logs              Log[]
+  alerts            Alert[]
+  lastSeenByDevices Device[] @relation("LastSeenGateway")
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([serialNumber])
+  @@map("gateways")
+}
+
+// Log - 訊號記錄（Beacon 掃描記錄）
+model Log {
+  id         String   @id @default(cuid())
+  deviceId   String
+  gatewayId  String
+  
+  // 訊號資訊
+  macAddress String   // Beacon MAC Address
+  rssi       Int      // 訊號強度
+  distance   Float?   // 估算距離（米）
+  proximity  Proximity? // immediate / near / far / unknown
+  
+  // iBeacon 資訊（如果有）
+  uuid       String?
+  major      Int?
+  minor      Int?
+  
+  // GPS 定位（志工位置）
+  latitude   Float?
+  longitude  Float?
+  altitude   Float?
+  accuracy   Float?   // 精確度（米）
+  
+  // 額外資訊
+  metadata   Json?    // 其他元數據
+  
+  timestamp  DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  // Relations
+  device  Device  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  gateway Gateway @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId])
+  @@index([gatewayId])
+  @@index([macAddress])
+  @@index([timestamp])
+  @@index([deviceId, timestamp])
+  @@index([gatewayId, timestamp])
+  @@map("logs")
+}
+
+// LocationLog - 行蹤記錄（長者移動軌跡）
+model LocationLog {
+  id        String   @id @default(cuid())
+  elderId   String
+  
+  // GPS 資訊
+  latitude  Float
+  longitude Float
+  altitude  Float?
+  accuracy  Float?   // 精確度（米）
+  
+  // 推測的活動狀態
+  activity  String?  // still / walking / running / driving
+  address   String?  // 反向地理編碼地址
+  
+  // 關聯資訊
+  sourceType     String?  // 來源類型：beacon_scan / gps_tracking / manual
+  sourceLogId    String?  // 如果來自 Log，關聯的 Log ID
+  sourceGatewayId String? // 偵測到的 Gateway ID
+  
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  // Relations
+  elder Elder @relation(fields: [elderId], references: [id], onDelete: Cascade)
+
+  @@index([elderId])
+  @@index([timestamp])
+  @@index([elderId, timestamp])
+  @@map("location_logs")
+}
+
+// Alert - 警報記錄
+model Alert {
+  id        String   @id @default(cuid())
+  tenantId  String
+  elderId   String
+  gatewayId String?  // 觸發警報的 Gateway（如果有）
+  
+  type      AlertType // BOUNDARY / INACTIVE / FIRST_ACTIVITY
+  status    AlertStatus @default(PENDING)
+  severity  AlertSeverity @default(MEDIUM)
+  
+  // 警報內容
+  title     String   // 警報標題
+  message   String   // 警報訊息
+  details   Json?    // 詳細資訊（JSON 格式）
+  
+  // 位置資訊
+  latitude  Float?
+  longitude Float?
+  location  String?  // 位置描述
+  
+  // 時間資訊
+  triggeredAt DateTime @default(now())
+  resolvedAt  DateTime?
+  resolvedBy  String?  // 處理人員 ID
+  resolution  String?  // 處理說明
+  
+  // 通知狀態
+  notificationSent    Boolean @default(false)
+  notificationSentAt  DateTime?
+  notificationError   String?
+  
+  // 分配與接單資訊
+  acceptedBy   String?   // 接單者的 AppUser ID
+  acceptedAt   DateTime? // 接單時間
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  elder       Elder              @relation(fields: [elderId], references: [id], onDelete: Cascade)
+  gateway     Gateway?           @relation(fields: [gatewayId], references: [id], onDelete: SetNull)
+  assignments AlertAssignment[]  // 分配記錄
+
+  @@index([tenantId])
+  @@index([elderId])
+  @@index([type])
+  @@index([status])
+  @@index([triggeredAt])
+  @@index([elderId, triggeredAt])
+  @@map("alerts")
+}
+
+// User - 後台管理員
+model User {
+  id          String   @id @default(cuid())
+  tenantId    String?  // Super Admin 沒有 tenantId
+  email       String   @unique
+  name        String
+  password    String   // 加密後的密碼
+  role        UserRole @default(STAFF)
+  
+  // 個人資訊
+  phone       String?
+  avatar      String?  // 頭像 URL
+  
+  // 狀態
+  isActive    Boolean  @default(true)
+  lastLoginAt DateTime?
+  lastLoginIp String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// AppUser - App 用戶（與後台 User 分開）
+model AppUser {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String   // 稱呼
+  password    String   // 加密後的密碼
+  
+  // 個人資訊
+  phone       String?
+  avatar      String?  // 頭像 URL
+  
+  // 狀態
+  isActive    Boolean  @default(true)
+  lastLoginAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tenantMemberships TenantMember[]
+  pushTokens        PushToken[]
+  alertAssignments  AlertAssignment[]
+
+  @@index([email])
+  @@map("app_users")
+}
+
+// TenantMember - 社區成員關係（含批准機制）
+model TenantMember {
+  id        String   @id @default(cuid())
+  tenantId  String
+  appUserId String
+  
+  // 成員角色
+  role      TenantMemberRole @default(MEMBER)
+  
+  // 申請與批准
+  status         MembershipStatus @default(PENDING)
+  requestedAt    DateTime @default(now())
+  processedAt    DateTime?
+  processedBy    String?  // User ID（可能是後台或 App 管理員）
+  processedByType String? // "backend" 或 "app"
+  rejectionReason String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appUser AppUser @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, appUserId])
+  @@index([tenantId])
+  @@index([appUserId])
+  @@index([status])
+  @@map("tenant_members")
+}
+
+// PushToken - Expo 推送通知 Token
+model PushToken {
+  id         String   @id @default(cuid())
+  appUserId  String
+  token      String   @unique // Expo Push Token
+  deviceInfo Json?    // 設備資訊
+  isActive   Boolean  @default(true)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  appUser AppUser @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+
+  @@index([appUserId])
+  @@index([token])
+  @@map("push_tokens")
+}
+
+// AlertAssignment - 警報分配給成員（多對多關係）
+model AlertAssignment {
+  id        String   @id @default(cuid())
+  alertId   String
+  appUserId String
+  
+  // 分配狀態
+  status     AssignmentStatus @default(PENDING)
+  respondedAt DateTime?       // 回應時間（接受或婉拒）
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  alert   Alert   @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  appUser AppUser @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+
+  @@unique([alertId, appUserId])
+  @@index([alertId])
+  @@index([appUserId])
+  @@index([status])
+  @@map("alert_assignments")
+}
+
+// ==================== Enums ====================
+
+enum ElderStatus {
+  ACTIVE      // 正常
+  INACTIVE    // 不活躍
+  HOSPITALIZED // 住院
+  DECEASED    // 已故
+  MOVED_OUT   // 遷出
+}
+
+enum DeviceType {
+  IBEACON     // iBeacon 格式
+  EDDYSTONE   // Eddystone 格式
+  GENERIC_BLE // 一般 BLE 設備
+}
+
+enum GatewayType {
+  GENERAL  // 一般接收點
+  BOUNDARY // 邊界點（觸發警報）
+  MOBILE   // 移動接收點（手機）
+}
+
+enum Proximity {
+  IMMEDIATE // < 1m
+  NEAR      // 1-3m
+  FAR       // > 3m
+  UNKNOWN   // 無法估算
+}
+
+enum AlertType {
+  BOUNDARY       // 邊界點警報
+  INACTIVE       // 不活躍警報
+  FIRST_ACTIVITY // 當日首次活動
+  LOW_BATTERY    // 低電量警報（未來功能）
+  EMERGENCY      // 緊急按鈕（未來功能）
+}
+
+enum AlertStatus {
+  PENDING   // 待處理
+  NOTIFIED  // 已通知
+  RESOLVED  // 已解決
+  DISMISSED // 已忽略
+}
+
+enum AlertSeverity {
+  LOW    // 低
+  MEDIUM // 中
+  HIGH   // 高
+  CRITICAL // 緊急
+}
+
+enum UserRole {
+  SUPER_ADMIN  // 超級管理員（跨社區）
+  TENANT_ADMIN // 社區管理員
+  STAFF        // 一般人員
+}
+
+enum TenantMemberRole {
+  MEMBER  // 一般成員
+  ADMIN   // 社區管理員
+}
+
+enum MembershipStatus {
+  PENDING   // 待批准
+  APPROVED  // 已批准
+  REJECTED  // 已拒絕
+}
+
+enum AssignmentStatus {
+  PENDING    // 等待回覆
+  ACCEPTED   // 已接受
+  DECLINED   // 已婉拒
+  CANCELLED  // 已撤銷（其他人已接受）
+}

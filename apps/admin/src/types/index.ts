@@ -1,0 +1,206 @@
+// User & Auth
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  tenantId: string | null;
+  phone?: string;
+  avatar?: string;
+}
+
+export type UserRole = "SUPER_ADMIN" | "TENANT_ADMIN" | "STAFF";
+
+export const UserRole = {
+  SUPER_ADMIN: "SUPER_ADMIN",
+  TENANT_ADMIN: "TENANT_ADMIN",
+  STAFF: "STAFF",
+} as const;
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  user: User;
+}
+
+// Tenant
+export interface Tenant {
+  id: string;
+  code: string;
+  name: string;
+  address?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  settings?: any;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Elder
+export interface Elder {
+  id: string;
+  tenantId: string;
+  name: string;
+  phone?: string;
+  address?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  photo?: string;
+  notes?: string;
+  status: ElderStatus;
+  inactiveThresholdHours: number;
+  lastActivityAt?: string;
+  lastSeenLocation?: any;
+  isActive: boolean;
+  device?: Device;
+  tenant?: Tenant;
+}
+
+export type ElderStatus =
+  | "ACTIVE"
+  | "INACTIVE"
+  | "HOSPITALIZED"
+  | "DECEASED"
+  | "MOVED_OUT";
+
+export const ElderStatus = {
+  ACTIVE: "ACTIVE",
+  INACTIVE: "INACTIVE",
+  HOSPITALIZED: "HOSPITALIZED",
+  DECEASED: "DECEASED",
+  MOVED_OUT: "MOVED_OUT",
+} as const;
+
+// Device
+export interface Device {
+  id: string;
+  elderId: string;
+  macAddress: string;
+  uuid?: string;
+  major?: number;
+  minor?: number;
+  deviceName?: string;
+  type: DeviceType;
+  batteryLevel?: number;
+  lastSeen?: string;
+  lastRssi?: number;
+  isActive: boolean;
+  elder?: Elder;
+}
+
+export type DeviceType = "IBEACON" | "EDDYSTONE" | "GENERIC_BLE";
+
+export const DeviceType = {
+  IBEACON: "IBEACON",
+  EDDYSTONE: "EDDYSTONE",
+  GENERIC_BLE: "GENERIC_BLE",
+} as const;
+
+// Gateway
+export interface Gateway {
+  id: string;
+  tenantId: string;
+  serialNumber: string;
+  name: string;
+  location?: string;
+  type: GatewayType;
+  latitude?: number;
+  longitude?: number;
+  deviceInfo?: any;
+  isActive: boolean;
+  tenant?: Tenant;
+}
+
+export type GatewayType = "GENERAL" | "BOUNDARY" | "MOBILE";
+
+export const GatewayType = {
+  GENERAL: "GENERAL",
+  BOUNDARY: "BOUNDARY",
+  MOBILE: "MOBILE",
+} as const;
+
+// Alert
+export interface Alert {
+  id: string;
+  tenantId: string;
+  elderId: string;
+  gatewayId?: string;
+  type: AlertType;
+  status: AlertStatus;
+  severity: AlertSeverity;
+  title: string;
+  message: string;
+  details?: any;
+  latitude?: number;
+  longitude?: number;
+  triggeredAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolution?: string;
+  elder?: Elder;
+  gateway?: Gateway;
+}
+
+export type AlertType =
+  | "BOUNDARY"
+  | "INACTIVE"
+  | "FIRST_ACTIVITY"
+  | "LOW_BATTERY"
+  | "EMERGENCY";
+
+export const AlertType = {
+  BOUNDARY: "BOUNDARY",
+  INACTIVE: "INACTIVE",
+  FIRST_ACTIVITY: "FIRST_ACTIVITY",
+  LOW_BATTERY: "LOW_BATTERY",
+  EMERGENCY: "EMERGENCY",
+} as const;
+
+export type AlertStatus = "PENDING" | "NOTIFIED" | "RESOLVED" | "DISMISSED";
+
+export const AlertStatus = {
+  PENDING: "PENDING",
+  NOTIFIED: "NOTIFIED",
+  RESOLVED: "RESOLVED",
+  DISMISSED: "DISMISSED",
+} as const;
+
+export type AlertSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+export const AlertSeverity = {
+  LOW: "LOW",
+  MEDIUM: "MEDIUM",
+  HIGH: "HIGH",
+  CRITICAL: "CRITICAL",
+} as const;
+
+// API Response
+export interface ApiResponse<T> {
+  data: T;
+  timestamp: string;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+// Dashboard Stats
+export interface DashboardStats {
+  tenants: { total: number };
+  elders: { total: number; active: number };
+  devices: { total: number };
+  gateways: { total: number };
+  alerts: { pending: number; today: number };
+  logs: { today: number };
+}
