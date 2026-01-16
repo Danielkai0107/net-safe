@@ -2,6 +2,9 @@
   "name": "@repo/backend",
   "version": "1.0.0",
   "description": "Safe-Net Backend API",
+  "prisma": {
+    "schema": "../../packages/database/prisma/schema.prisma"
+  },
   "scripts": {
     "build": "nest build",
     "dev": "ts-node -r tsconfig-paths/register src/main.ts",
