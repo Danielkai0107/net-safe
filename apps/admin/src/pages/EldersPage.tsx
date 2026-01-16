@@ -3,11 +3,15 @@ import { Plus, Search, Phone, MapPin, Edit, Trash2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { elderService } from '../services/elderService';
 import { tenantService } from '../services/tenantService';
-import type { Elder, Tenant, ElderStatus } from '../types';
+import type { Elder, Tenant } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+
+interface ElderFormData extends Partial<Elder> {
+  deviceId?: string;
+}
 
 export const EldersPage = () => {
   const [elders, setElders] = useState<Elder[]>([]);
@@ -22,7 +26,7 @@ export const EldersPage = () => {
   const [editingElder, setEditingElder] = useState<Elder | null>(null);
   const [deletingElder, setDeletingElder] = useState<Elder | null>(null);
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<Partial<Elder>>();
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<ElderFormData>();
   const watchTenantId = watch('tenantId');
 
   useEffect(() => {
@@ -107,13 +111,14 @@ export const EldersPage = () => {
     }
   };
 
-  const onSubmit = async (data: Partial<Elder>) => {
+  const onSubmit = async (data: ElderFormData) => {
     try {
+      // 後端 API 支持 deviceId，直接傳送完整數據
       if (editingElder) {
-        await elderService.update(editingElder.id, data);
+        await elderService.update(editingElder.id, data as any);
         alert('更新成功');
       } else {
-        await elderService.create(data);
+        await elderService.create(data as any);
         alert('新增成功');
       }
       setShowModal(false);
