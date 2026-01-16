@@ -44,7 +44,7 @@ export const GatewaysPage = () => {
     try {
       setLoading(true);
       // 只有當 filterType 不是空字符串時才傳遞
-      const typeParam = filterType && filterType !== '' ? filterType : undefined;
+      const typeParam = filterType !== '' ? filterType : undefined;
       const response: any = await gatewayService.getAll(page, 10, undefined, typeParam);
       setGateways(response.data.data);
       setTotal(response.data.meta.total);

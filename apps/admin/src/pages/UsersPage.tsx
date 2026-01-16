@@ -444,7 +444,7 @@ export const UsersPage = () => {
         title="確認刪除"
         message={`確定要刪除「${deletingUser?.name}」嗎？此操作無法復原。`}
         confirmText="刪除"
-        confirmStyle="danger"
+        type="danger"
       />
     </div>
   );

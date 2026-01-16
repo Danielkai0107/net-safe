@@ -3,7 +3,6 @@ import { Plus, Search, Phone, MapPin, Edit, Trash2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { elderService } from '../services/elderService';
 import { tenantService } from '../services/tenantService';
-import { deviceService } from '../services/deviceService';
 import type { Elder, Tenant, ElderStatus } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';

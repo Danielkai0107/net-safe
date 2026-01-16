@@ -307,7 +307,7 @@ export const AppUsersPage = () => {
         title="確認刪除"
         message={`確定要刪除「${deletingUser?.name}」嗎？此操作無法復原。該用戶的所有社區成員關係也會被刪除。`}
         confirmText="刪除"
-        confirmStyle="danger"
+        type="danger"
       />
     </div>
   );
