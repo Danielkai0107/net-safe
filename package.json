@@ -18,7 +18,10 @@
     "update-ip": "node scripts/get-local-ip.js",
     "show-ip": "node scripts/show-network-info.js",
     "check-backend": "node scripts/check-backend.js",
-    "test:alert": "tsx scripts/create-test-alert.ts"
+    "test:alert": "tsx scripts/create-test-alert.ts",
+    "deploy:check": "node scripts/deploy-check.js",
+    "deploy:secrets": "node scripts/generate-secrets.js",
+    "deploy:update-mobile": "node scripts/update-mobile-config.js"
   },
   "keywords": [],
   "author": "",
