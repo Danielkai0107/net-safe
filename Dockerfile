@@ -8,11 +8,12 @@ WORKDIR /app
 # Copy everything
 COPY . .
 
-# Install dependencies
+# Fix for pnpm v10: allow scripts execution
+RUN pnpm config set only-allow-approved-scripts false
 RUN pnpm install --frozen-lockfile
 
-# Generate Prisma Client (backend package.json now has schema path configured)
-RUN cd apps/backend && npx prisma generate
+# Generate Prisma Client
+RUN cd apps/backend && pnpm exec prisma generate
 
 # Build backend
 RUN cd apps/backend && pnpm build
@@ -35,4 +36,4 @@ WORKDIR /app/apps/backend
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/main.js"]
